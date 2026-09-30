@@ -68,3 +68,11 @@ uv run ruff format .      # format
 uv run ruff check .       # lint
 uv run ty check main.py   # type check
 ```
+
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the script works end to end, instaloader defaults, exit codes, quirks to leave alone, known limitations, and the decision log |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, daily commands, verification checklist, how to add a flag, conventions, troubleshooting |
+| [CLAUDE.md](CLAUDE.md) | One-page brief for AI assistants working in this repo |
