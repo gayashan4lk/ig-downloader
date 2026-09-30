@@ -2,31 +2,32 @@
 """
 Download Instagram images.
 
-Requires: pip install instaloader
+Setup: uv sync
 
 Examples:
     # Public profile, newest 20 posts, images only
-    python ig_download.py --profile natgeo --limit 20
+    uv run main.py --profile natgeo --limit 20
 
     # A single post
-    python ig_download.py --post https://www.instagram.com/p/C1abcdefg/
+    uv run main.py --post https://www.instagram.com/p/C1abcdefg/
 
     # Your own saved posts (needs login)
-    python ig_download.py --saved --login yourusername
+    uv run main.py --saved --login yourusername
 
     # Posts from a profile after a date
-    python ig_download.py --profile natgeo --since 2025-01-01
+    uv run main.py --profile natgeo --since 2025-01-01
 """
 
 import argparse
 import sys
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
 try:
     import instaloader
 except ImportError:
-    sys.exit("instaloader is not installed. Run: pip install instaloader")
+    sys.exit("instaloader is not installed. Run: uv sync")
 
 
 def build_loader(dest: Path, images_only: bool) -> instaloader.Instaloader:
@@ -74,7 +75,7 @@ def parse_date(value: str) -> datetime:
     try:
         return datetime.strptime(value, "%Y-%m-%d")
     except ValueError:
-        raise argparse.ArgumentTypeError(f"Use YYYY-MM-DD, got {value!r}")
+        raise argparse.ArgumentTypeError(f"Use YYYY-MM-DD, got {value!r}") from None
 
 
 def shortcode_from_url(url: str) -> str:
@@ -87,7 +88,14 @@ def shortcode_from_url(url: str) -> str:
     return parts[-1]
 
 
-def download_posts(loader, posts, target, limit, since, until):
+def download_posts(
+    loader: instaloader.Instaloader,
+    posts: Iterable[instaloader.Post],
+    target: str,
+    limit: int | None,
+    since: datetime | None,
+    until: datetime | None,
+) -> int:
     count = 0
     for post in posts:
         if until and post.date_utc > until:
@@ -118,7 +126,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.saved and not args.login:
-        return ap.error("--saved requires --login")
+        ap.error("--saved requires --login")
 
     dest = Path(args.out).expanduser().resolve()
     dest.mkdir(parents=True, exist_ok=True)
@@ -141,16 +149,24 @@ def main() -> int:
                 print(f"{args.profile} is private and you don't follow them.", file=sys.stderr)
                 return 1
             n = download_posts(
-                loader, profile.get_posts(), profile.username,
-                args.limit, args.since, args.until,
+                loader,
+                profile.get_posts(),
+                profile.username,
+                args.limit,
+                args.since,
+                args.until,
             )
             print(f"Downloaded {n} post(s) to {dest / profile.username}")
 
         else:  # --saved
             profile = instaloader.Profile.from_username(loader.context, args.login)
             n = download_posts(
-                loader, profile.get_saved_posts(), "saved",
-                args.limit, args.since, args.until,
+                loader,
+                profile.get_saved_posts(),
+                "saved",
+                args.limit,
+                args.since,
+                args.until,
             )
             print(f"Downloaded {n} saved post(s) to {dest / 'saved'}")
 
