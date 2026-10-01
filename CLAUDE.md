@@ -37,7 +37,7 @@ Flat by design — no `src/`, no package, no console-script entry point
 
 - **Instaloader behaviour is centralised in `build_loader()`** ([main.py:33](main.py#L33)).
   Anything changing what lands on disk goes there and nowhere else.
-- **Reuse `download_posts()`** ([main.py:91](main.py#L91)) for any new post source; don't write
+- **Reuse `download_posts()`** ([main.py:94](main.py#L94)) for any new post source; don't write
   a second download loop.
 - **Annotate every new function fully** — `ty` skips unannotated parameters.
 - **Never let an exception escape `main()`.** Catch it, print one actionable line to `stderr`,

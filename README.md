@@ -46,8 +46,24 @@ uv run main.py --profile natgeo --since 2025-01-01
 
 Exactly one of `--profile`, `--post`, or `--saved` is required.
 
-Files land in `<out>/<target>/` as `YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg` (carousel slides
-get `_1`, `_2`, … suffixes). Dates and times are UTC.
+Each post gets its own folder, grouped by profile:
+
+```
+downloads/
+  natgeo/                                      # --profile natgeo, or a --post by natgeo
+    2025-01-03_14-22-10_3301234567890123456/   # <post date>_<numeric media ID>
+      2025-01-03_14-22-10_C1abcdefg_1.jpg      # carousel slides get _1, _2, …
+      2025-01-03_14-22-10_C1abcdefg_2.jpg
+      2025-01-03_14-22-10_C1abcdefg_3.mp4      # only with --include-videos
+  saved/
+    nasa/                                      # --saved, grouped by who posted it
+      2024-11-20_08-00-00_3298765432109876543/
+        2024-11-20_08-00-00_C2hijklmn.jpg
+```
+
+Dates and times are UTC. Downloads made before this layout existed (flat files directly in
+`<out>/<user>/`) are left where they are. Re-running re-downloads those posts into the new
+folders.
 
 ## Logging in
 
