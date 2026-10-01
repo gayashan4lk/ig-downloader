@@ -30,9 +30,12 @@ except ImportError:
     sys.exit("instaloader is not installed. Run: uv sync")
 
 
-def build_loader(dest: Path, images_only: bool) -> instaloader.Instaloader:
+def build_loader(dest: Path, images_only: bool, saved: bool) -> instaloader.Instaloader:
+    # One folder per post: <out>/<user>/<date>_<mediaid>/. Saved posts are grouped by
+    # owner under <out>/saved/, since the saved feed mixes many users.
+    owner_dir = dest / "saved" / "{owner_username}" if saved else dest / "{target}"
     return instaloader.Instaloader(
-        dirname_pattern=str(dest / "{target}"),
+        dirname_pattern=str(owner_dir / "{date_utc:%Y-%m-%d_%H-%M-%S}_{mediaid}"),
         filename_pattern="{date_utc:%Y-%m-%d_%H-%M-%S}_{shortcode}",
         download_videos=not images_only,
         download_video_thumbnails=False,
@@ -131,7 +134,7 @@ def main() -> int:
     dest = Path(args.out).expanduser().resolve()
     dest.mkdir(parents=True, exist_ok=True)
 
-    loader = build_loader(dest, images_only=not args.include_videos)
+    loader = build_loader(dest, images_only=not args.include_videos, saved=args.saved)
 
     if args.login:
         login(loader, args.login)

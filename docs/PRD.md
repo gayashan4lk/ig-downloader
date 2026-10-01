@@ -30,7 +30,8 @@ so the output folder holds only images.
    flag.
 2. **Images only by default:** no videos, thumbnails, captions, metadata, geotags, or
    comments unless explicitly asked for (videos only, via `--include-videos`).
-3. **Sortable output:** files named `YYYY-MM-DD_HH-MM-SS_<shortcode>`, one folder per profile.
+3. **Sortable output:** one folder per profile, one folder per post inside it
+   (`YYYY-MM-DD_HH-MM-SS_<mediaid>`), and files named `YYYY-MM-DD_HH-MM-SS_<shortcode>`.
 4. **Log in once:** reuse a cached session on later runs.
 5. **Fail politely:** expected failures (rate limit, private profile, missing login) print one
    actionable line and exit non-zero, with no traceback.
@@ -92,7 +93,7 @@ Status legend: ✅ shipped · ⚠️ shipped with a known defect · 🔜 planned
 |---|---|---|
 | O1 | Images only by default; no thumbnails, captions, JSON, geotags, or comments | ✅ |
 | O2 | `--include-videos` also downloads videos | ✅ |
-| O3 | Files go to `<out>/<target>/YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg`; carousel slides add `_1`, `_2`, … | ✅ |
+| O3 | Each post gets its own folder: `<out>/<username>/YYYY-MM-DD_HH-MM-SS_<mediaid>/YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg`; carousel slides add `_1`, `_2`, …; `--saved` posts go under `<out>/saved/<owner>/` ([ADR-9](ARCHITECTURE.md#adr-9-one-folder-per-post)) | ✅ |
 | O4 | `--out` sets the root directory (default `downloads/`, gitignored), created if missing | ✅ |
 | O5 | Re-running skips files already on disk | ✅ (instaloader behaviour; the feed is still walked from the top) |
 | O6 | The final "Downloaded N post(s)" line reports what was actually written | ⚠️ counts posts attempted, including skipped ones and video-only posts that produced no file |
@@ -143,7 +144,8 @@ Status legend: ✅ shipped · ⚠️ shipped with a known defect · 🔜 planned
   and the three bad-flag cases each exit 2 with a one-line message.
 - The lint/format/type gate passes.
 - A logged-in `--profile <user> --limit 2 --out /tmp/ig-smoke` run (by the maintainer) writes
-  only `.jpg` files named by date and shortcode, with no `.txt`/`.json` sidecars, and exits 0.
+  one folder per post containing only `.jpg` files named by date and shortcode, with no
+  `.txt`/`.json` sidecars, and exits 0.
 - A rate-limited run exits 1 with "Connection/rate-limit problem: …" and no traceback.
 
 ## 10. Open questions

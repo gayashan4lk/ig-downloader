@@ -67,10 +67,10 @@ network and no stubbing:
 
 | Layer | What to cover | Target |
 |---|---|---|
-| Pure functions | `shortcode_from_url` across `/p/`, `/reel/`, `/reels/`, `/tv/` and bare-shortcode inputs; `parse_date` accepting `YYYY-MM-DD` and rejecting junk | [main.py:74](../main.py#L74), [main.py:81](../main.py#L81) |
-| Filter loop | `download_posts` honouring `--limit`, `--since`, `--until` | [main.py:91](../main.py#L91) |
+| Pure functions | `shortcode_from_url` across `/p/`, `/reel/`, `/reels/`, `/tv/` and bare-shortcode inputs; `parse_date` accepting `YYYY-MM-DD` and rejecting junk | [main.py:77](../main.py#L77), [main.py:84](../main.py#L84) |
+| Filter loop | `download_posts` honouring `--limit`, `--since`, `--until` | [main.py:94](../main.py#L94) |
 | Known bugs (write these first, as failing tests) | a post at 10:00 UTC on the `--until` day is kept; an old post first in the feed doesn't stop `--since`; `--limit 0` is rejected; `shortcode_from_url("…/p/ABC?img_index=2") == "ABC"` | [ROADMAP P1/P2](ROADMAP.md#next-up) |
-| CLI wiring | Exit code 2 for bad flag combinations | [main.py:113](../main.py#L113) |
+| CLI wiring | Exit code 2 for bad flag combinations | [main.py:116](../main.py#L116) |
 
 Rules of thumb:
 - **Unit tests must never hit the network.** `download_posts` takes the loader and the post
@@ -101,10 +101,12 @@ uv run main.py --profile natgeo --limit 2 --out /tmp/ig-smoke
 find /tmp/ig-smoke -type f
 ```
 
-Expected: `.jpg` files only under `/tmp/ig-smoke/natgeo/`, named
-`YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg` (carousels add `_1`, `_2`, …, so two posts can mean more
-than two files, and a video-only post means fewer). No videos, no `.txt` or `.json` sidecars,
-exit 0.
+Expected: one folder per post under `/tmp/ig-smoke/natgeo/`, named
+`YYYY-MM-DD_HH-MM-SS_<mediaid>/`, each holding `.jpg` files only, named
+`YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg`. Carousels add `_1`, `_2`, … in the same folder, so two
+posts can mean more than two files, and a video-only post leaves no files and possibly no
+folder. No videos, no `.txt` or `.json` sidecars, exit 0. A `--saved` run nests the same way
+under `/tmp/ig-smoke/saved/<owner>/`.
 
 Known-bad inputs, so nobody wastes time on them:
 - **Anonymous `--profile` is unreliable.** On 2026-09-30 repeated attempts returned
@@ -123,9 +125,9 @@ Known-bad inputs, so nobody wastes time on them:
 Worked example, following how `--include-videos` is wired:
 
 1. **Declare it** in `main()` beside the related flags
-   ([main.py:116-125](../main.py#L116-L125)). Group it in the mutually exclusive `src` group
+   ([main.py:119-128](../main.py#L119-L128)). Group it in the mutually exclusive `src` group
    only if it is a new *source*.
-2. **Validate combinations** right after `parse_args()` ([main.py:128](../main.py#L128)) using
+2. **Validate combinations** right after `parse_args()` ([main.py:131](../main.py#L131)) using
    `ap.error("...")` as a statement — it exits 2 and never returns.
 3. **Thread the value** to the function that consumes it. If it changes what instaloader
    writes, it belongs in `build_loader()` and nowhere else. If it filters posts, extend
@@ -160,15 +162,15 @@ Worked example, following how `--include-videos` is wired:
 |---|---|---|
 | `instaloader is not installed. Run: uv sync` | Ran `python main.py` with a non-project interpreter | Use `uv run main.py` |
 | `401 ... "Please wait a few minutes before you try again."` | Instagram rate-limiting anonymous API access | Wait; re-run with `--login`; lower `--limit` |
-| `Connection/rate-limit problem: …` then exit 1 | Three attempts exhausted ([main.py:45](../main.py#L45)) | Wait before retrying — this is the designed graceful exit, not a crash |
+| `Connection/rate-limit problem: …` then exit 1 | Three attempts exhausted ([main.py:48](../main.py#L48)) | Wait before retrying — this is the designed graceful exit, not a crash |
 | `Instagram wants a login for this.` | Content needs auth | Re-run with `--login <username>` |
 | `<user> is private and you don't follow them.` | Private profile | Follow the account, or use an account that does, via `--login` |
-| Password prompt on every run | Session file missing or unreadable | Check `~/.config/instaloader/session-<username>`; it is written after a successful fresh login ([main.py:69-71](../main.py#L69-L71)) |
+| Password prompt on every run | Session file missing or unreadable | Check `~/.config/instaloader/session-<username>`; it is written after a successful fresh login ([main.py:72-74](../main.py#L72-L74)) |
 | `--saved` returns fewer posts than expected | `--since` short-circuits on save-ordered feeds | Drop `--since`, use `--limit`; see [Known limitations](ARCHITECTURE.md#known-limitations) |
 | `--profile X --since D` downloads 0 posts | An old pinned post at the top of the feed ends the loop | Drop `--since`; see [Known limitations](ARCHITECTURE.md#known-limitations) |
 | Posts from the `--until` day are missing | `--until` is compared as 00:00 UTC of that day | Pass the next day |
 | Traceback ending in `BadCredentialsException` / `LoginException` | Wrong password or 2FA code, or a blocked login. The login path is outside `main()`'s `try`. | Re-run and retype; tracked in [ROADMAP P1](ROADMAP.md#p1-correct-filters-and-no-tracebacks) |
 | Traceback ending in `BadResponseException: Fetching Post metadata failed.` | Mistyped or deleted `--post` shortcode | Check the URL. A URL with `?` right after the shortcode isn't parsed; trim the query string |
 | Logged-in run fails with a login/connection error that used to work | Cached session expired; it is never re-validated | Delete `~/.config/instaloader/session-<username>` and re-run to get the password prompt |
-| Videos appearing in output | `--include-videos` was passed, or `build_loader()` defaults were edited | Check [main.py:33-47](../main.py#L33-L47) |
+| Videos appearing in output | `--include-videos` was passed, or `build_loader()` defaults were edited | Check [main.py:33-50](../main.py#L33-L50) |
 | `ty` reports unresolved `instaloader` | `.venv` missing or stale | `uv sync`. Do **not** silence it with a `[tool.ty.rules]` ignore — it resolves cleanly in a synced env |
