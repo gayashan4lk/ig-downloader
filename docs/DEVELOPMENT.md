@@ -51,8 +51,9 @@ Always go through `uv run`. Invoking `python main.py` directly uses whatever int
 3. Work through the [manual verification checklist](#manual-verification-checklist) — there are
    no automated tests to catch you.
 4. Update docs that the change invalidates: the README options table for a new flag,
-   [ARCHITECTURE.md](ARCHITECTURE.md) for structural changes, and add an ADR there for any
-   choice someone might later question.
+   [ARCHITECTURE.md](ARCHITECTURE.md) for structural changes (and drop any Known-limitations
+   row you fixed), the requirement status in [PRD.md](PRD.md#6-functional-requirements), and
+   the [ROADMAP.md](ROADMAP.md) item. Add an ADR for any choice someone might later question.
 5. Don't commit or push unless asked.
 
 ## Testing strategy
@@ -68,6 +69,7 @@ network and no stubbing:
 |---|---|---|
 | Pure functions | `shortcode_from_url` across `/p/`, `/reel/`, `/reels/`, `/tv/` and bare-shortcode inputs; `parse_date` accepting `YYYY-MM-DD` and rejecting junk | [main.py:74](../main.py#L74), [main.py:81](../main.py#L81) |
 | Filter loop | `download_posts` honouring `--limit`, `--since`, `--until` | [main.py:91](../main.py#L91) |
+| Known bugs (write these first, as failing tests) | a post at 10:00 UTC on the `--until` day is kept; an old post first in the feed doesn't stop `--since`; `--limit 0` is rejected; `shortcode_from_url("…/p/ABC?img_index=2") == "ABC"` | [ROADMAP P1/P2](ROADMAP.md#next-up) |
 | CLI wiring | Exit code 2 for bad flag combinations | [main.py:113](../main.py#L113) |
 
 Rules of thumb:
@@ -99,16 +101,22 @@ uv run main.py --profile natgeo --limit 2 --out /tmp/ig-smoke
 find /tmp/ig-smoke -type f
 ```
 
-Expected: two files at `/tmp/ig-smoke/natgeo/YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg`, no videos,
-no `.txt` or `.json` sidecars, exit 0.
+Expected: `.jpg` files only under `/tmp/ig-smoke/natgeo/`, named
+`YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg` (carousels add `_1`, `_2`, …, so two posts can mean more
+than two files, and a video-only post means fewer). No videos, no `.txt` or `.json` sidecars,
+exit 0.
 
 Known-bad inputs, so nobody wastes time on them:
 - **Anonymous `--profile` is unreliable.** On 2026-09-30 repeated attempts returned
   `401 "Please wait a few minutes before you try again."` for the public `natgeo` profile. A
   rate-limit exit (code 1, "Connection/rate-limit problem: …", no traceback) confirms the error
   path but does *not* confirm downloading works. Use `--login` for a real check.
-- `--saved --since <date>` may under-report; see
-  [Known limitations](ARCHITECTURE.md#known-limitations).
+- `--saved --since <date>` may under-report, `--profile --since` can return 0 when an old post
+  is pinned, and `--until <date>` excludes that date. These are known bugs, not regressions;
+  see [Known limitations](ARCHITECTURE.md#known-limitations).
+- The filter logic in `download_posts()` can be checked offline, without a real loader. Pass
+  a stub with `download_post(post, target)` and a list of objects carrying `date_utc`. That is
+  how the bugs above were confirmed.
 
 ## Adding a new flag
 
@@ -157,5 +165,10 @@ Worked example, following how `--include-videos` is wired:
 | `<user> is private and you don't follow them.` | Private profile | Follow the account, or use an account that does, via `--login` |
 | Password prompt on every run | Session file missing or unreadable | Check `~/.config/instaloader/session-<username>`; it is written after a successful fresh login ([main.py:69-71](../main.py#L69-L71)) |
 | `--saved` returns fewer posts than expected | `--since` short-circuits on save-ordered feeds | Drop `--since`, use `--limit`; see [Known limitations](ARCHITECTURE.md#known-limitations) |
+| `--profile X --since D` downloads 0 posts | An old pinned post at the top of the feed ends the loop | Drop `--since`; see [Known limitations](ARCHITECTURE.md#known-limitations) |
+| Posts from the `--until` day are missing | `--until` is compared as 00:00 UTC of that day | Pass the next day |
+| Traceback ending in `BadCredentialsException` / `LoginException` | Wrong password or 2FA code, or a blocked login. The login path is outside `main()`'s `try`. | Re-run and retype; tracked in [ROADMAP P1](ROADMAP.md#p1-correct-filters-and-no-tracebacks) |
+| Traceback ending in `BadResponseException: Fetching Post metadata failed.` | Mistyped or deleted `--post` shortcode | Check the URL. A URL with `?` right after the shortcode isn't parsed; trim the query string |
+| Logged-in run fails with a login/connection error that used to work | Cached session expired; it is never re-validated | Delete `~/.config/instaloader/session-<username>` and re-run to get the password prompt |
 | Videos appearing in output | `--include-videos` was passed, or `build_loader()` defaults were edited | Check [main.py:33-47](../main.py#L33-L47) |
 | `ty` reports unresolved `instaloader` | `.venv` missing or stale | `uv sync`. Do **not** silence it with a `[tool.ty.rules]` ignore — it resolves cleanly in a synced env |

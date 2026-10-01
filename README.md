@@ -41,12 +41,13 @@ uv run main.py --profile natgeo --since 2025-01-01
 | `--out <dir>` | Output directory (default: `downloads`) |
 | `--limit <n>` | Stop after N posts |
 | `--since <YYYY-MM-DD>` | Only posts on or after this date |
-| `--until <YYYY-MM-DD>` | Only posts on or before this date |
+| `--until <YYYY-MM-DD>` | Only posts on or before this date (currently excludes the date itself, see [known limitations](docs/ARCHITECTURE.md#known-limitations)) |
 | `--include-videos` | Also download videos (off by default) |
 
 Exactly one of `--profile`, `--post`, or `--saved` is required.
 
-Files land in `<out>/<target>/` as `YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg`.
+Files land in `<out>/<target>/` as `YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg` (carousel slides
+get `_1`, `_2`, … suffixes). Dates and times are UTC.
 
 ## Logging in
 
@@ -73,6 +74,8 @@ uv run ty check main.py   # type check
 
 | Document | What it covers |
 | --- | --- |
+| [docs/PRD.md](docs/PRD.md) | What the tool is for, goals and non-goals, requirements with shipped/known-defect status, risks, open questions |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the script works end to end, instaloader defaults, exit codes, quirks to leave alone, known limitations, and the decision log |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Prioritised backlog (each item with why and where in the code), and recurring maintenance |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, daily commands, verification checklist, how to add a flag, conventions, troubleshooting |
 | [CLAUDE.md](CLAUDE.md) | One-page brief for AI assistants working in this repo |
