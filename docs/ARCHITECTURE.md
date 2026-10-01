@@ -3,7 +3,8 @@
 How `ig-downloader` is put together, why it is shaped this way, and what will surprise you.
 One script, one runtime dependency — the [Decisions](#decisions) section is folded in at the
 bottom rather than kept in a separate file. See [DEVELOPMENT.md](DEVELOPMENT.md) for how to
-set up and change it.
+set up and change it, [PRD.md](PRD.md) for what it is meant to do, and
+[ROADMAP.md](ROADMAP.md) for what to fix next.
 
 ## Overview
 
@@ -70,8 +71,10 @@ currently no test suite at all — see [DEVELOPMENT.md](DEVELOPMENT.md#testing-s
    - `--saved`: `Profile.from_username(args.login)` then `download_posts()` over
      `profile.get_saved_posts()`.
 7. **Map errors to exit codes.** One `try` block around all of step 6 catches four specific
-   exception types and turns each into a one-line message on stderr plus a numeric exit code.
-   Nothing is allowed to surface as a traceback.
+   exception types (plus `KeyboardInterrupt`) and turns each into a one-line message on stderr
+   plus a numeric exit code. The intent is that nothing surfaces as a traceback, but steps 3
+   and 5 run *outside* that `try`, and several instaloader exception types aren't caught.
+   See [Known limitations](#known-limitations).
 
 ## Key configuration
 
@@ -95,15 +98,19 @@ from instaloader's defaults. Re-enabling any of them changes what lands on disk.
 ## Outputs and exit codes
 
 Files: `<out>/<target>/YYYY-MM-DD_HH-MM-SS_<shortcode>.jpg`, where `<target>` is the profile
-username, the post owner's username (for `--post`), or the literal `saved`. `--out` defaults
-to `downloads`, which is gitignored.
+username, the post owner's username (for `--post`), or the literal `saved`. Carousel posts
+write one file per slide with a `_1`, `_2`, … suffix before the extension. A video-only post
+writes nothing unless `--include-videos` is set (then `.mp4`). Times in filenames and in the
+`--since`/`--until` comparison are UTC. A file already on disk is skipped, so re-runs only
+fetch what's missing, though the feed is still walked from the top. `--out` defaults to
+`downloads`, which is gitignored.
 
 | Exit code | Meaning | Source |
 |---|---|---|
 | 0 | Success | [main.py:186](../main.py#L186) |
 | 1 | Private profile, profile not found, login required, or connection/rate-limit failure | [main.py:150](../main.py#L150), [173-181](../main.py#L173-L181) |
 | 2 | Bad flags (argparse) | argparse default |
-| 130 | Interrupted with Ctrl-C | [main.py:184](../main.py#L184) |
+| 130 | Interrupted with Ctrl-C during fetch/download (not at the password prompt; see below) | [main.py:184](../main.py#L184) |
 
 ## Quirks and workarounds
 
@@ -122,7 +129,15 @@ Please don't "clean up" these without reading the reason.
 
 | Limitation | Impact | Workaround |
 |---|---|---|
-| `--saved --since` can stop early and miss posts | `download_posts()` breaks on the first post older than `--since` ([main.py:103-105](../main.py#L103-L105)) because profile feeds are newest-first. The same function serves `get_saved_posts()`, which is ordered by when you *saved* a post, not when it was posted — so an old post saved recently can end the loop prematurely. | Use `--saved` with `--limit` instead of `--since`, or filter afterwards. Fixing it means making the newest-first shortcut conditional on the source. |
+| `--saved --since` can stop early and miss posts | `download_posts()` breaks on the first post older than `--since` ([main.py:103-105](../main.py#L103-L105)) because profile feeds are newest-first. The same function serves `get_saved_posts()`, which is ordered by when you *saved* a post, not when it was posted — so an old post saved recently can end the loop prematurely. | Use `--saved` with `--limit` instead of `--since`, or filter afterwards. Fix planned: [ROADMAP P1](ROADMAP.md#p1-correct-filters-and-no-tracebacks). |
+| A pinned post can make `--profile --since` download nothing | Profiles can pin up to 3 posts to the top of the feed. If one is older than `--since`, the same `break` fires on the first post. Reproduced offline with stub posts: 0 of 2 matching posts downloaded. instaloader's own loop guards against this with `possibly_pinned=3`; ours doesn't. | Drop `--since` and use `--limit`, or use `--until` alone. Fix planned: [ROADMAP P1](ROADMAP.md#p1-correct-filters-and-no-tracebacks). |
+| `--until` excludes its own day | `parse_date` returns midnight, and `download_posts()` skips `date_utc > until` ([main.py:101](../main.py#L101)), so `--until 2025-01-31` drops everything posted on the 31st after 00:00 UTC. The help text and README say "on/before". | Pass the following day. Fix planned: [ROADMAP P1](ROADMAP.md#p1-correct-filters-and-no-tracebacks). |
+| Some failures still print a traceback | `dest.mkdir()` and `login()` run before the `try` ([main.py:131-137](../main.py#L131-L137)), so an unwritable `--out` (`OSError`), a wrong password or 2FA code (`BadCredentialsException`), other `LoginException`s, connection errors during login, and Ctrl-C at the password prompt all escape `main()`. Inside the `try`, only four exception types are caught. `BadResponseException` (e.g. a mistyped `--post` shortcode), `QueryReturnedBadRequestException`, `QueryReturnedForbiddenException`, and `PostChangedException` aren't subclasses of any of them. | Read the last line of the traceback; it is usually self-explanatory. Fix planned: [ROADMAP P1](ROADMAP.md#p1-correct-filters-and-no-tracebacks). |
+| "Downloaded N post(s)" and `--limit` count attempts, not files | `download_posts()` increments for every post handed to `download_post()` ([main.py:106-107](../main.py#L106-L107)), including posts whose files were already on disk and video-only posts that write nothing in images-only mode. | Check the output folder for the real count. See [ROADMAP P2](ROADMAP.md#p2-day-to-day-usability). |
+| `--limit 0` means unlimited | `if limit and ...` treats 0 as "no limit"; a negative limit downloads one post. No validation in argparse. | Pass a positive number. |
+| A stale cached session isn't detected | `login()` returns as soon as `load_session_from_file` succeeds ([main.py:53-56](../main.py#L53-L56)), without checking the cookies still work, so an expired session never falls back to the password prompt. | Delete `~/.config/instaloader/session-<username>` and re-run. |
+| A URL with `?` straight after the shortcode isn't parsed | `shortcode_from_url` splits on `/` only, so `.../p/ABC?img_index=2` yields `ABC?img_index=2`. `.../p/ABC/?igsh=…` (the usual share-link form) is fine. | Trim the query string, or pass the bare shortcode. |
+| Session directory isn't `0700` | `login()` creates `~/.config/instaloader` itself ([main.py:69](../main.py#L69)), so instaloader skips its `chmod 0700` on the directory. The session file is still written `0600`. | `chmod 700 ~/.config/instaloader`. |
 | Anonymous access is heavily rate-limited | `--profile` without `--login` frequently returns `401 "Please wait a few minutes before you try again."` even for public profiles. Observed repeatedly on 2026-09-30. The tool retries 3× then exits 1 with a readable message. | Pass `--login <username>`; keep runs small with `--limit`. |
 | `--post` silently ignores `--limit`, `--since`, `--until` | Those flags only feed `download_posts()`, which the single-post path does not call. No warning is printed. | Nothing needed; just know they have no effect there. |
 | `profile.is_private and not profile.followed_by_viewer` ([main.py:148](../main.py#L148)) | `followed_by_viewer` is only meaningful when logged in, so the early, friendly "private profile" check effectively requires `--login`. Anonymously you get a less specific error instead. | Use `--login`. |

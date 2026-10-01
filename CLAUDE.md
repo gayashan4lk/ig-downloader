@@ -9,7 +9,8 @@ profile's posts, one post by URL, or your own saved collection. It wraps
 [instaloader](https://instaloader.github.io/) with images-only defaults and is managed with
 [uv](https://docs.astral.sh/uv/).
 
-Docs: [Architecture + decisions](docs/ARCHITECTURE.md) · [Development guide](docs/DEVELOPMENT.md)
+Docs: [PRD](docs/PRD.md) · [Architecture + decisions](docs/ARCHITECTURE.md) ·
+[Roadmap](docs/ROADMAP.md) · [Development guide](docs/DEVELOPMENT.md)
 
 ## Commands
 
@@ -41,6 +42,11 @@ Flat by design — no `src/`, no package, no console-script entry point
 - **Annotate every new function fully** — `ty` skips unannotated parameters.
 - **Never let an exception escape `main()`.** Catch it, print one actionable line to `stderr`,
   return non-zero. Exit codes: 0 success, 1 runtime/network failure, 2 bad flags, 130 Ctrl-C.
+  Not fully true yet: the login path and some exception types still escape
+  ([known limitations](docs/ARCHITECTURE.md#known-limitations)). Don't add new gaps.
+- **Known filter bugs** (`--until` day boundary, pinned posts vs `--since`, `--saved --since`)
+  are documented and queued in [ROADMAP P1](docs/ROADMAP.md#p1-correct-filters-and-no-tracebacks).
+  Don't mistake them for regressions from your change.
 - **Don't remove these deliberate oddities** (full reasons in the
   [quirks table](docs/ARCHITECTURE.md#quirks-and-workarounds)): the function-local
   `import getpass`; `raise ... from None` in `parse_date`; `ap.error(...)` called as a
@@ -54,6 +60,8 @@ Flat by design — no `src/`, no package, no console-script entry point
 - Git: branch off `main` (`fix/…`, `feat/…`, `docs/…`); don't commit or push unless asked.
 - After a change, update the README options table (new flags) and
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (structure, or a new ADR for non-obvious calls).
+  When fixing a known bug, also flip its status in [docs/PRD.md](docs/PRD.md), tick it in
+  [docs/ROADMAP.md](docs/ROADMAP.md), and remove its Known-limitations row.
 
 ## Verifying real behaviour
 
