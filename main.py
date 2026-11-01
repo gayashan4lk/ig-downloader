@@ -180,7 +180,13 @@ def main() -> int:
         print("Instagram wants a login for this. Re-run with --login <username>.", file=sys.stderr)
         return 1
     except instaloader.exceptions.ConnectionException as e:
-        print(f"Connection/rate-limit problem: {e}\nWait a while before retrying.", file=sys.stderr)
+        # Anonymous requests are throttled far harder than logged-in ones, so point at --login
+        hint = (
+            "Wait a while before retrying."
+            if args.login
+            else "Re-run with --login <username>; anonymous access is heavily rate-limited."
+        )
+        print(f"Connection/rate-limit problem: {e}\n{hint}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         print("\nStopped.", file=sys.stderr)

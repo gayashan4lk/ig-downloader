@@ -111,10 +111,10 @@ fetch what's missing, though the feed is still walked from the top. `--out` defa
 
 | Exit code | Meaning | Source |
 |---|---|---|
-| 0 | Success | [main.py:189](../main.py#L189) |
-| 1 | Private profile, profile not found, login required, or connection/rate-limit failure | [main.py:153](../main.py#L153), [176-184](../main.py#L176-L184) |
+| 0 | Success | [main.py:195](../main.py#L195) |
+| 1 | Private profile, profile not found, login required, or connection/rate-limit failure | [main.py:153](../main.py#L153), [176-190](../main.py#L176-L190) |
 | 2 | Bad flags (argparse) | argparse default |
-| 130 | Interrupted with Ctrl-C during fetch/download (not at the password prompt; see below) | [main.py:187](../main.py#L187) |
+| 130 | Interrupted with Ctrl-C during fetch/download (not at the password prompt; see below) | [main.py:193](../main.py#L193) |
 
 ## Quirks and workarounds
 
@@ -142,7 +142,7 @@ Please don't "clean up" these without reading the reason.
 | A stale cached session isn't detected | `login()` returns as soon as `load_session_from_file` succeeds ([main.py:56-59](../main.py#L56-L59)), without checking the cookies still work, so an expired session never falls back to the password prompt. | Delete `~/.config/instaloader/session-<username>` and re-run. |
 | A URL with `?` straight after the shortcode isn't parsed | `shortcode_from_url` splits on `/` only, so `.../p/ABC?img_index=2` yields `ABC?img_index=2`. `.../p/ABC/?igsh=…` (the usual share-link form) is fine. | Trim the query string, or pass the bare shortcode. |
 | Session directory isn't `0700` | `login()` creates `~/.config/instaloader` itself ([main.py:72](../main.py#L72)), so instaloader skips its `chmod 0700` on the directory. The session file is still written `0600`. | `chmod 700 ~/.config/instaloader`. |
-| Anonymous access is heavily rate-limited | `--profile` without `--login` frequently returns `401 "Please wait a few minutes before you try again."` even for public profiles. Observed repeatedly on 2026-09-30. The tool retries 3× then exits 1 with a readable message. | Pass `--login <username>`; keep runs small with `--limit`. |
+| Anonymous access is heavily rate-limited | `--profile` or `--post` without `--login` frequently returns `401 "Please wait a few minutes before you try again."` even for public profiles. Observed repeatedly on 2026-09-30. The tool retries 3× then exits 1; without `--login` the message says to re-run with it. | Pass `--login <username>`; keep runs small with `--limit`. |
 | `--post` silently ignores `--limit`, `--since`, `--until` | Those flags only feed `download_posts()`, which the single-post path does not call. No warning is printed. | Nothing needed; just know they have no effect there. |
 | `profile.is_private and not profile.followed_by_viewer` ([main.py:151](../main.py#L151)) | `followed_by_viewer` is only meaningful when logged in, so the early, friendly "private profile" check effectively requires `--login`. Anonymously you get a less specific error instead. | Use `--login`. |
 | instaloader calls `datetime.utcfromtimestamp()`, deprecated in Python 3.12 | Silent today (DeprecationWarning is hidden by default), but it will break when Python removes it, and switching to aware datetimes upstream would break our date comparison. | Watch on Python upgrades; run with `-W error::DeprecationWarning` to see it. |
