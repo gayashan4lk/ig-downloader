@@ -4,3 +4,15 @@ __pycache__/
 downloads/
 .ruff_cache/
 .ty_cache/
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.apdisk
